@@ -210,7 +210,7 @@ class Deconfounder():
         print("Training complete.")
         return updated_params
     
-    def train(self, X_train, y_train):
+    def train(self, X_train, y_train, num_samples=1000):
         num_datapoints, data_dim = X_train.shape
 
         params0 = {
@@ -229,7 +229,7 @@ class Deconfounder():
         } # These are our priors
 
         params1 = self.step1_train(X_train, params0)
-        params2 = self.step2_train(X_train, y_train, params1)
+        params2 = self.step2_train(X_train, y_train, params1, num_samples=num_samples)
         self.step1_params = params1
         self.step2_params = params2
         self.test_params = None
