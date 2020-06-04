@@ -232,6 +232,7 @@ class Deconfounder():
         params2 = self.step2_train(X_train, y_train, params1)
         self.step1_params = params1
         self.step2_params = params2
+        self.test_params = None
         return params1, params2
     
     def condition_causal(self, their_tensors, absent_tensors, movie_inds, num_samples=1000):
@@ -272,8 +273,7 @@ class Deconfounder():
 
         return causal_effect_conf
     
-    def do_predict(self, X_test, num_samples=1000):
-        
+    def infer_z(self, X_test):
         num_datapoints, data_dim = X_test.shape
 
         params0 = {
@@ -281,6 +281,8 @@ class Deconfounder():
             'z_std0' : torch.ones([num_datapoints, self.latent_dim]),
             'w_mean0' : self.step1_params['w_mean0'],
             'w_std0' : self.step1_params['w_std0'],
+            #'w_mean0' : torch.zeros([self.latent_dim, data_dim]),
+            #'w_std0' : torch.ones([self.latent_dim, data_dim]),
             'weight_mean0': self.step1_params['weight_mean0'],
             'weight_std0': self.step1_params['weight_std0'],
             #'weight2_mean0': self.step1_params['weight2_mean0'],
@@ -291,44 +293,33 @@ class Deconfounder():
             'sigma_std0' : self.step1_params['sigma_std0']
         } # These are our priors
 
-        params1 = self.step1_train(X_test, params0)
+        self.test_params = self.step1_train(X_test, params0)
+    
+    def do_predict(self, X_test, num_samples=1000):
+        
+        if self.test_params is None:
+            self.infer_z(X_test)
         
         do = pyro.do(model, data = {"x" : X_test})
         predictions = np.zeros((X_test.shape[0]))
         for _ in range(num_samples):
-            y_pred = do(params1)['y']
+            y_pred = do(self.test_params)['y']
             predictions += y_pred.detach().numpy()
         
-        return predictions / num_samples, params1
+        return predictions / num_samples, self.test_params
         #x_do = pyro.do(f_x, data = {"x" : X_test})
         
     def cond_predict(self, X_test, num_samples=1000):
-        num_datapoints, data_dim = X_test.shape
-
-        params0 = {
-            'z_mean0': torch.zeros([num_datapoints, self.latent_dim]),
-            'z_std0' : torch.ones([num_datapoints, self.latent_dim]),
-            'w_mean0' : self.step1_params['w_mean0'],
-            'w_std0' : self.step1_params['w_std0'],
-            'weight_mean0': self.step1_params['weight_mean0'],
-            'weight_std0': self.step1_params['weight_std0'],
-            #'weight2_mean0': self.step1_params['weight2_mean0'],
-            #'weight2_std0': self.step1_params['weight2_std0'],
-            'bias_mean0': self.step1_params['bias_mean0'],
-            'bias_std0': self.step1_params['bias_std0'],
-            'sigma_mean0' : self.step1_params['sigma_mean0'],
-            'sigma_std0' : self.step1_params['sigma_std0']
-        } # These are our priors
-
-        params1 = self.step1_train(X_test, params0)
+        if self.test_params is None:
+            self.infer_z(X_test)
         
         cond = pyro.condition(model, data = {"x" : X_test})
         predictions = np.zeros((X_test.shape[0]))
         for _ in range(num_samples):
-            y_pred = cond(params1)['y']
+            y_pred = cond(self.test_params)['y']
             predictions += y_pred.detach().numpy()
         
-        return predictions / num_samples, params1
+        return predictions / num_samples, self.test_params
     
     '''def do_predict(self, X_test, num_samples=1000):
         
