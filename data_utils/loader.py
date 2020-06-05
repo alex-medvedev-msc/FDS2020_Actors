@@ -28,10 +28,10 @@ class Loader():
         self.data_X = data_rev.loc[mask, data_rev.columns.difference(['revenue'])]
         self.data_y = data_rev.loc[mask, 'revenue']
 
-        X = self.data_X.drop("title_x", axis=1).to_numpy(dtype='float32')
-        y = np.log1p(self.data_y.to_numpy(dtype='float32'))
+        self.X = self.data_X.drop("title_x", axis=1).to_numpy(dtype='float32')
+        self.y = np.log1p(self.data_y.to_numpy(dtype='float32'))
         
-        self.X_train, self.X_test, self.y_train, self.y_test, self.data_train, self.data_test = train_test_split(X, y, self.data_X, test_size=0.2, random_state=seed)
+        self.X_train, self.X_test, self.y_train, self.y_test, self.data_train, self.data_test = train_test_split(self.X, self.y, self.data_X, test_size=0.2, random_state=seed)
         
     def get_train_test(self):
         return torch.tensor(self.X_train), torch.tensor(self.X_test), \
