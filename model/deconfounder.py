@@ -6,6 +6,7 @@ import torch.nn as nn
 import sys
 
 import pyro
+from pyro import poutine
 from pyro.distributions import Bernoulli
 from pyro.distributions import Delta
 from pyro.distributions import Normal
@@ -49,8 +50,11 @@ def f_x(z, params):
         return W
     W = sample_W()
     linear_exp = torch.matmul(z, W)
+    # if mask:
+    # linear_exp = torch.matmul(torch.matmul(z, W), params['mask'])
     # sample x using the Bernoulli likelihood
     x = pyro.sample("x", Bernoulli(logits = linear_exp))
+    x = torch.mul(x, params['mask'])
     return x
 
 def f_y(x, z, params):
@@ -210,7 +214,7 @@ class Deconfounder():
         print("Training complete.")
         return updated_params
     
-    def train(self, X_train, y_train, num_samples=1000):
+    def train(self, X_train, y_train, num_samples=1000, mask=None):
         num_datapoints, data_dim = X_train.shape
 
         params0 = {
@@ -225,8 +229,13 @@ class Deconfounder():
             'bias_mean0': torch.tensor(0.),
             'bias_std0': torch.tensor(1.),
             'sigma_mean0' : torch.tensor(1.),
-            'sigma_std0' : torch.tensor(0.05)
+            'sigma_std0' : torch.tensor(0.05),
         } # These are our priors
+
+        if mask is None:
+            mask = torch.ones(X_train.shape)
+
+        params0['mask'] = mask
 
         params1 = self.step1_train(X_train, params0)
         params2 = self.step2_train(X_train, y_train, params1, num_samples=num_samples)
@@ -290,7 +299,8 @@ class Deconfounder():
             'bias_mean0': self.step1_params['bias_mean0'],
             'bias_std0': self.step1_params['bias_std0'],
             'sigma_mean0' : self.step1_params['sigma_mean0'],
-            'sigma_std0' : self.step1_params['sigma_std0']
+            'sigma_std0' : self.step1_params['sigma_std0'],
+            'mask' : torch.ones(X_test.shape)
         } # These are our priors
 
         self.test_params = self.step1_train(X_test, params0)
